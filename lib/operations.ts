@@ -1,0 +1,5 @@
+export const defaultOperations=['Laser','Bending','Welding','Cleaning','Painting','Assembly'];
+export function operationNames(config:any):string[]{return Array.from(new Set([...defaultOperations,...(config.operations||[])]));}
+export function validOperationName(value:unknown):value is string{return typeof value==='string'&&value===value.trim()&&value.length>0&&value.length<=80&&!/[\/\\\u0000-\u001f]/.test(value)&&!['__proto__','constructor','prototype'].includes(value.toLowerCase());}
+export function addOperations(existing:string[],incoming:unknown):string[]{if(!Array.isArray(incoming)||!incoming.every(validOperationName))throw new Error('Use operation names of 1–80 characters, without slashes.');const result=[...existing];for(const name of incoming){if(!result.some(x=>x.toLowerCase()===name.toLowerCase()))result.push(name);}return result;}
+export function mayWriteOperation(c:any,operation:string){return operationNames(c.config).includes(operation)&&(c.admin||c.operation===operation);}
