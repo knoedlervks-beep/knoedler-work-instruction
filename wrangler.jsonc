@@ -11,7 +11,7 @@
     {
       "binding": "DB",
       "database_name": "knoedler-instructions",
-      "database_id": "00000000-0000-4000-8000-000000000000",
+      "database_id": "2f0a5a8d-ef61-436c-a053-3150ff85b7f7",
       "migrations_dir": "drizzle"
     }
   ],
