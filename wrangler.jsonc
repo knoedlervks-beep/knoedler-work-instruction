@@ -23,7 +23,7 @@
   ],
   "vars": {
     "ADMIN_EMAIL": "knoedlervks@gmail.com",
-    "CF_ACCESS_TEAM_DOMAIN": "https://YOUR-TEAM.cloudflareaccess.com",
-    "CF_ACCESS_AUD": "REPLACE_WITH_ACCESS_APPLICATION_AUD"
+    "CF_ACCESS_TEAM_DOMAIN": "https://restless-haze-72cb.cloudflareaccess.com",
+    "CF_ACCESS_AUD": "aee44a7fa5e94fef51b717a26b67539f97d716cf3f0b1b57b1c357c28b60b06b"
   }
 }
