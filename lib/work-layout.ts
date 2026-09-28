@@ -1,5 +1,5 @@
 import {stepPhotos} from './photos';
-export const PAGE_W=720, PAGE_H=850;
+export const PAGE_W=1080, PAGE_H=540;
 export type ElementKind='image'|'arrow'|'rectangle'|'circle'|'highlight'|'text'|'marker'|'table';
 export type WorkElement={id:string;type:ElementKind;x:number;y:number;w:number;h:number;color?:string;image?:string;html?:string;number?:number;note?:string;flipX?:boolean;flipY?:boolean;parentId?:string};
 export const id=()=>crypto.randomUUID();
