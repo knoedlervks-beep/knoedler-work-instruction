@@ -1,6 +1,6 @@
 import {env} from 'cloudflare:workers';
 import {getAccessUser} from './access';
-import {mayWriteOperation} from './operations';
+import {mayWriteOperation,memberOperations,operationNames} from './operations';
 export function db(): D1Database {return (env as any).DB;}
 export function bucket(): R2Bucket {return (env as any).BUCKET;}
 export async function context(){
@@ -11,9 +11,9 @@ export async function context(){
  let row:any=await db().prepare('SELECT value FROM settings WHERE id=?').bind('config').first();
  if(!row){if(!admin)throw new Error('An administrator must initialize this workspace.');await db().prepare('INSERT OR IGNORE INTO settings(id,value) VALUES(?,?)').bind('config',JSON.stringify({adminId:user.userId,adminEmail:user.email,folders:{},members:[]})).run();row=await db().prepare('SELECT value FROM settings WHERE id=?').bind('config').first();}
  const config=JSON.parse(row.value);
- const member=config.members.find((x:any)=>x.email.toLowerCase()===user.email.toLowerCase());
- if(!admin&&!member)throw new Error('Your account has not been assigned an operation. Contact your administrator.');
- return {user,config,admin,operation:member?.operation};
+ const operations=Array.from(new Set((config.members||[]).filter((x:any)=>x.email.trim().toLowerCase()===user.email.toLowerCase()).flatMap(memberOperations))).filter((op:any)=>operationNames(config).includes(op)) as string[];
+ if(!admin&&!operations.length)throw new Error('Your account has not been assigned an operation. Contact your administrator.');
+ return {user,config,admin,operation:operations[0],operations:admin?operationNames(config):operations};
 }
 export function writable(c:any,operation:string){if(!mayWriteOperation(c,operation))throw new Error('This operation is not assigned to your account.');}
 export function sameOrigin(r:Request){if(r.headers.get('origin')!==new URL(r.url).origin)throw new Error('Please reload the page and try again.');}

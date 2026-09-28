@@ -1,13 +1,42 @@
 import {jsPDF} from 'jspdf';
-import {stepPhotos} from './photos';
-export async function makePDF(d:any){
- const p=new jsPDF();let y=0;
- function page(){p.setFillColor(20,38,60);p.rect(0,0,210,21,'F');p.setTextColor(255);p.setFontSize(13);p.text('KNOEDLER  /  WORK INSTRUCTION',12,13);p.setTextColor(20,38,60);p.setFontSize(9);p.text(`${d.operation} | Knoedler: ${d.knoedlerPart}   Rev: ${d.knoedlerRev||'-'}`,12,30);p.text(`Customer: ${d.customerPart||'-'}   Rev: ${d.customerRev||'-'}`,12,36);y=44;}
- function ensure(h:number){if(y+h>278){p.addPage();page();}}
- function text(t:string,size=11){p.setFontSize(size);const lines=p.splitTextToSize(t||'',184);for(const l of lines){ensure(6);p.setFontSize(size);p.text(l,12,y);y+=6;}y+=3;}
- page();text(d.description,15);
- for(let i=0;i<d.steps.length;i++){const s=d.steps[i];if(i>0&&(s.type==='text'||d.steps[i-1].type==='text')){p.addPage();page();}ensure(22);p.setFont('helvetica','bold');text(`${String(i+1).padStart(2,'0')}  ${s.title||(s.type==='text'?'Untitled text sheet':'Untitled step')}`,13);p.setFont('helvetica','normal');
- const photos=stepPhotos(s);for(let photoIndex=0;photoIndex<photos.length;photoIndex++){const photo=photos[photoIndex];const img=await new Promise<HTMLImageElement>((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(new Error('A photo could not load. Please retry PDF export.'));im.src=photo.image;});const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=Math.round(1200*img.height/img.width);const c=canvas.getContext('2d')!;c.drawImage(img,0,0,canvas.width,canvas.height);for(const a of photo.annotations||[]){const x=a.x*canvas.width/100,y=a.y*canvas.height/100,x2=a.x2*canvas.width/100,y2=a.y2*canvas.height/100;c.strokeStyle=a.color;c.fillStyle=a.color;c.lineWidth=5;c.beginPath();if(a.type==='arrow'){c.moveTo(x,y);c.lineTo(x2,y2);const ang=Math.atan2(y2-y,x2-x);c.moveTo(x2-20*Math.cos(ang-.5),y2-20*Math.sin(ang-.5));c.lineTo(x2,y2);c.lineTo(x2-20*Math.cos(ang+.5),y2-20*Math.sin(ang+.5));c.stroke();}else if(a.type==='circle'){c.ellipse((x+x2)/2,(y+y2)/2,Math.abs(x2-x)/2,Math.abs(y2-y)/2,0,0,Math.PI*2);c.stroke();}else if(a.type==='text'){c.font='bold 30px Arial';c.fillText(a.text,x,y);}else{if(a.type==='highlight'){c.globalAlpha=.3;c.fillRect(x,y,x2-x,y2-y);c.globalAlpha=1;}else c.strokeRect(x,y,x2-x,y2-y);}}const columns=photos.length>1?2:1;const boxW=columns===2?89:184;const boxH=columns===2?85:125;const ratio=canvas.height/canvas.width;const h=Math.min(boxH,boxW*ratio);const w=h/ratio;if(photoIndex%columns===0)ensure(boxH+12);const x=12+(photoIndex%columns)*95;p.addImage(canvas.toDataURL('image/jpeg',.9),'JPEG',x,y,w,h);p.setFontSize(8);p.text(`Photo ${photoIndex+1}`,x,y+h+4);if(photoIndex%columns===columns-1||photoIndex===photos.length-1)y+=boxH+12;}
- text(s.notes||'');for(const table of s.tables||[]){const cw=184/table[0].length;for(let r=0;r<table.length;r++){const lines=table[r].map((v:string)=>p.splitTextToSize(v||' ',cw-5));const h=Math.max(...lines.map((l:any)=>l.length))*5+6;ensure(h);for(let col=0;col<lines.length;col++){p.setFillColor(...(r===0?[231,237,244]:[255,255,255]) as [number,number,number]);p.setDrawColor(190);p.rect(12+cw*col,y,cw,h,'FD');p.setFontSize(9);p.text(lines[col],14+cw*col,y+5);}y+=h;}y+=8;}}
- for(let n=1;n<=p.getNumberOfPages();n++){p.setPage(n);p.setFontSize(8);p.setTextColor(100);p.text(`Knoedler Manufacturers | ${d.updated?new Date(d.updated).toLocaleDateString():'Draft'} | Page ${n} of ${p.getNumberOfPages()}`,12,290);}return p;
+import {createRoot} from 'react-dom/client';
+import {flushSync} from 'react-dom';
+import {createElement} from 'react';
+import html2canvas from '@/vendor/html2canvas';
+import {StepBody,printCSS} from '@/components/work/page-view';
+import {upgradeDocument,loadImage,PAGE_W} from './work-layout';
+
+export async function makePDF(input:any){
+ const d=await upgradeDocument(input),p=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+ const logo=await loadImage('/knoedler-logo.png');
+ const lc=document.createElement('canvas');lc.width=logo.naturalWidth;lc.height=logo.naturalHeight;lc.getContext('2d')!.drawImage(logo,0,0);const logoData=lc.toDataURL('image/png');
+ const host=document.createElement('div');host.style.cssText='position:fixed;left:-10000px;top:0;width:720px;background:#fff;color:#18283f;z-index:-1;';
+ const style=document.createElement('style');style.textContent=printCSS;host.appendChild(style);
+ const mount=document.createElement('div');host.appendChild(mount);document.body.appendChild(host);const root=createRoot(mount);
+ let count=0;
+ function header(step:any,index:number,continuation:boolean){if(count++)p.addPage();p.setTextColor(24,40,63);p.setFont('helvetica','bold');p.setFontSize(14);p.addImage(logoData,'PNG',12,8,28,28*logo.naturalHeight/logo.naturalWidth);p.text('WORK INSTRUCTION',48,16);p.setFont('helvetica','normal');p.setFontSize(9);p.text(p.splitTextToSize(`${d.operation} | ${d.description}`,145).slice(0,2),48,23);p.setDrawColor(180,194,211);p.line(12,32,198,32);p.setFontSize(9);p.text(`Knoedler: ${d.knoedlerPart}   Rev: ${d.knoedlerRev||'-'}`,12,38,{maxWidth:90});p.text(`Customer: ${d.customerPart||'-'}   Rev: ${d.customerRev||'-'}`,108,38,{maxWidth:90});p.setFont('helvetica','bold');p.setFontSize(11);p.text(p.splitTextToSize(`Step ${index+1} - ${step.title|| (step.type==='text'?'Text sheet':'Photo instruction')}${continuation?' (continued)':''}`,184).slice(0,2),12,47);}
+ try{
+  for(let i=0;i<d.steps.length;i++){
+   const s=d.steps[i];flushSync(()=>root.render(createElement(StepBody,{step:s})));
+   await document.fonts.ready;
+   await Promise.all(Array.from(mount.querySelectorAll('img')).map(im=>im.complete&&im.naturalWidth?Promise.resolve():new Promise<void>((resolve,reject)=>{im.onload=()=>resolve();im.onerror=()=>reject(new Error('A photo could not load. Retry before exporting.'));})));
+   // Overflow is an explicit editing issue; never silently truncate a text box in the PDF.
+   for(const box of Array.from(mount.querySelectorAll('.wi-rich')) as HTMLElement[])if(box.style.overflow==='hidden'&&box.scrollHeight>box.clientHeight+2)throw new Error(`Step ${i+1}: enlarge the text or table box so all its content fits before exporting.`);
+   const body=mount.firstElementChild as HTMLElement;const total=Math.ceil(body.getBoundingClientRect().height),limit=850;
+   // Avoid cutting through photos, table rows and text lines when a page break is necessary.
+   const rect=body.getBoundingClientRect(),bands:Array<[number,number]>=[];
+   for(const el of Array.from(body.querySelectorAll('img,tr'))){const r=el.getBoundingClientRect();bands.push([r.top-rect.top,r.bottom-rect.top]);}
+   const walker=document.createTreeWalker(body,NodeFilter.SHOW_TEXT);let node:Node|null;
+   while((node=walker.nextNode())){if(!node.textContent?.trim())continue;const range=document.createRange();range.selectNodeContents(node);for(const r of Array.from(range.getClientRects()))bands.push([r.top-rect.top,r.bottom-rect.top]);}
+   let start=0;
+   while(start<total){let end=Math.min(total,start+limit);if(end<total){for(let pass=0;pass<10;pass++){const crossing=bands.filter(([a,b])=>a<end&&b>end&&a>start+20);if(!crossing.length)break;end=Math.min(...crossing.map(([a])=>Math.floor(a)));}}
+    if(end<=start+10)end=Math.min(total,start+limit);
+    header(s,i,start>0);
+    const canvas=await html2canvas(body,{backgroundColor:'#ffffff',scale:1.6,width:PAGE_W,height:end-start,y:start,logging:false,useCORS:false,windowWidth:1000,windowHeight:1400});
+    p.addImage(canvas.toDataURL('image/jpeg',.94),'JPEG',12,56,186,(end-start)*186/PAGE_W);canvas.width=1;canvas.height=1;start=end;
+   }
+  }
+  for(let n=1;n<=p.getNumberOfPages();n++){p.setPage(n);p.setDrawColor(180,194,211);p.line(12,282,198,282);p.setFont('helvetica','normal');p.setFontSize(8);p.setTextColor(92,108,128);p.text(`Knoedler Manufacturers Canada Ltee | ${d.updated?new Date(d.updated).toLocaleDateString():'Draft'}`,12,288);p.text(`Page ${n} of ${p.getNumberOfPages()}`,198,288,{align:'right'});}
+  return p;
+ }finally{root.unmount();host.remove();}
 }
