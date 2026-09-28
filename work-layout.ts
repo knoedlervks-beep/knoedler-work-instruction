@@ -1,5 +1,5 @@
 import {stepPhotos} from './photos';
-export const PAGE_W=720, PAGE_H=850;
+export const PAGE_W=1080, PAGE_H=540;
 export type ElementKind='image'|'arrow'|'rectangle'|'circle'|'highlight'|'text'|'marker'|'table';
 export type WorkElement={id:string;type:ElementKind;x:number;y:number;w:number;h:number;color?:string;image?:string;html?:string;number?:number;note?:string;flipX?:boolean;flipY?:boolean;parentId?:string};
 export const id=()=>crypto.randomUUID();
@@ -25,12 +25,12 @@ export function cleanHTML(html:string):string {
 }
 export function tableHTML(rows=3,cols=3){return '<table><tbody>'+Array.from({length:rows},(_,r)=>'<tr>'+Array.from({length:cols},(_,c)=>`<${r?'td':'th'}>${r?'':`Column ${c+1}`}<br></${r?'td':'th'}>`).join('')+'</tr>').join('')+'</tbody></table><p><br></p>';}
 export function oldTableHTML(table:string[][]){return '<table><tbody>'+table.map((row,r)=>'<tr>'+row.map(cell=>`<${r?'td':'th'}>${escapeHTML(cell)}</${r?'td':'th'}>`).join('')+'</tr>').join('')+'</tbody></table>';}
-export function newStep(type='photo'){return {id:id(),type,title:'',notes:'',photos:[],tables:[],elements:[],bodyHtml:'<p><br></p>',layoutVersion:2};}
+export function newStep(type='photo'){return {id:id(),type,title:'',notes:'',photos:[],tables:[],elements:[],bodyHtml:'<p><br></p>',layoutVersion:2,orientation:'landscape'};}
 export function newDocument(operation='Laser'){return {id:id(),customerPart:'',customerRev:'',knoedlerPart:'',knoedlerRev:'',description:'',operation,version:0,steps:[newStep()]};}
 export function loadImage(src:string):Promise<HTMLImageElement>{return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('A photo could not load. Check your connection and try again.'));img.src=src;});}
 // Add layout without discarding the original legacy fields or changing the stored document on read.
 export async function upgradeDocument(source:any){const d=structuredClone(source);for(const s of d.steps){
- if(s.layoutVersion===2){s.elements=(s.elements||[]).map((e:WorkElement)=>({...e,...(e.html?{html:cleanHTML(e.html)}:{})}));s.bodyHtml=cleanHTML(s.bodyHtml||'');s.notesHtml=cleanHTML(s.notesHtml||'');continue;}
+ if(s.layoutVersion===2){if(s.orientation!=='landscape'){s.canvasHeight=Math.max(PAGE_H,...(s.elements||[]).map((e:WorkElement)=>Math.max(e.y,e.y+e.h)+20));s.orientation='landscape';}s.elements=(s.elements||[]).map((e:WorkElement)=>({...e,...(e.html?{html:cleanHTML(e.html)}:{})}));s.bodyHtml=cleanHTML(s.bodyHtml||'');s.notesHtml=cleanHTML(s.notesHtml||'');continue;}
  s.elements=[];s.bodyHtml=plainHTML(s.notes||'')+(s.tables||[]).map(oldTableHTML).join('');s.layoutVersion=2;
  if(s.type==='text')continue;
  const photos=stepPhotos(s),cols=photos.length>1?2:1;let rowY=20,rowHeight=0;
@@ -45,6 +45,6 @@ export async function upgradeDocument(source:any){const d=structuredClone(source
  }
  // Legacy notes and tables flow below the canvas so no saved content is lost or clipped.
  s.notesHtml=plainHTML(s.notes||'')+(s.tables||[]).map(oldTableHTML).join('');
- s.canvasHeight=Math.max(PAGE_H,rowY+10);
+ s.canvasHeight=Math.max(PAGE_H,rowY+10);s.orientation='landscape';
  }return d;}
 export function elementBounds(e:WorkElement){return {left:Math.min(e.x,e.x+e.w),top:Math.min(e.y,e.y+e.h),width:Math.abs(e.w),height:Math.abs(e.h)};}
