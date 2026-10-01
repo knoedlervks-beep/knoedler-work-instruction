@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {Toaster,toast} from 'sonner';
 import {Save,Download,Eye,Undo2,Redo2,Plus,Camera,ImagePlus,FileText,Settings2,FolderOpen,ArrowLeft,ArrowRight,Copy,Trash2,CloudUpload} from 'lucide-react';
+import {instructionFilename} from '@/lib/instruction-filename';
 import {makePDF} from '@/lib/pdf';
 import {operationNames,validOperationName,memberOperations} from '@/lib/operations';
 import {newDocument,newStep,upgradeDocument,id,loadImage,PAGE_W,PAGE_H,WorkElement} from '@/lib/work-layout';
@@ -24,7 +25,7 @@ export default function Editor(){
  function field(key:string,value:string){checkpoint();change({...doc,[key]:value});}
  function undo(redo=false){const src=redo?future:history,dst=redo?history:future;if(!src.current.length)return;dst.current.push(structuredClone(doc));const target=src.current.pop();setDoc({...target,version:doc.version,updated:doc.updated,driveId:doc.driveId});setIndex(Math.min(index,target.steps.length-1));setSelected(null);setDirty(true);setHistoryTick(x=>x+1);}
  async function save(){const j=await api('/api/work',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({document:live.current})});setDoc(j.document);live.current=j.document;setDirty(false);setData((v:any)=>({...v,instructions:[j.document,...v.instructions.filter((x:any)=>x.id!==j.document.id)]}));return j.document;}
- async function pdf(drive=false){let current=live.current;if(drive)current=await save();const p=await makePDF(current);if(drive){const f=new FormData();f.append('id',current.id);f.append('pdf',p.output('blob'),'instruction.pdf');await api('/api/work',{method:'PUT',body:f});toast.success('PDF saved to Google Drive.');}else{p.save(`${current.knoedlerPart||'Work-instruction'}_Rev-${current.knoedlerRev||'NA'}_${current.operation}.pdf`);toast.success('Landscape PDF downloaded.');}}
+ async function pdf(drive=false){let current=live.current;const filename=instructionFilename(current);if(drive)current=await save();const p=await makePDF(current);if(drive){const f=new FormData();f.append('id',current.id);f.append('pdf',p.output('blob'),'instruction.pdf');const result=await api('/api/work',{method:'PUT',body:f});const synced={...live.current,driveId:result.driveId};live.current=synced;setDoc(synced);setData((v:any)=>({...v,instructions:v.instructions.map((d:any)=>d.id===synced.id?{...d,driveId:result.driveId}:d)}));toast.success('PDF saved to Google Drive. Future saves update this same file.');}else{p.save(filename);toast.success('Landscape PDF downloaded.');}}
  function resetHistory(){history.current=[];future.current=[];setSelected(null);setIndex(0);setHistoryTick(x=>x+1);}
  function fresh(){if(dirty&&!confirm('Discard unsaved changes and start a new instruction?'))return;setDoc(newDocument(data.user.operation||'Laser'));setDirty(false);setTab('editor');setPreview(false);setDetails(true);resetHistory();}
  async function open(source:any){if(dirty&&!confirm('Discard unsaved changes and open this instruction?'))return;const next=await upgradeDocument(source);setDoc(next);setDirty(false);setTab('editor');setPreview(false);setDetails(false);resetHistory();}

@@ -6572,6 +6572,9 @@ var FontMetrics = /** @class */ (function () {
         img.height = 1;
         img.style.margin = '0';
         img.style.padding = '0';
+        // Keep the measuring image inline despite Tailwind's global image reset.
+        img.style.display = 'inline-block';
+        img.style.maxWidth = 'none';
         img.style.verticalAlign = 'baseline';
         span.style.fontFamily = fontFamily;
         span.style.fontSize = fontSize;
