@@ -8,7 +8,7 @@ export async function saveDrivePDF(database:D1Database,row:any,folder:string,nam
   if(!generated.ok)throw new Error('Google Drive could not prepare this file. Check the Drive connection and retry.');
   const data:any=await generated.json();if(!data.ids?.[0])throw new Error('Google Drive did not return a file ID. Retry the export.');
   const pending='pending:'+data.ids[0];
-  await database.prepare("UPDATE instructions SET drive_id=? WHERE id=? AND (drive_id IS NULL OR drive_id='')").bind(pending,row.id).run();
+  await database.prepare("UPDATE instructions SET drive_id=? WHERE id=? AND (drive_id IS NULL OR drive_id='') AND COALESCE(json_extract(data,'$.deleting'),0)=0 AND COALESCE(json_extract(data,'$.deleted'),0)=0").bind(pending,row.id).run();
   const latest:any=await database.prepare('SELECT drive_id FROM instructions WHERE id=?').bind(row.id).first();
   stored=latest?.drive_id;if(!stored)throw new Error('Unable to reserve the Drive file. Retry the export.');
  }
